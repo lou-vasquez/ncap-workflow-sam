@@ -1,10 +1,10 @@
 {
     "Comment": "A state machine that does mock stock trading.",
-    "StartAt": "Check Stock Value",
+    "StartAt": "Generate Info",
     "States": {
-        "Check Stock Value": {
+        "Generate Info": {
             "Type": "Task",
-            "Resource": "${StockCheckerFunctionArn}",
+            "Resource": "${GenerateInfoFunctionArn}",
             "Retry": [
                 {
                     "ErrorEquals": [
@@ -15,22 +15,22 @@
                     "BackoffRate": 1.5
                 }
             ],
-            "Next": "Buy or Sell?"
+            "Next": "Archive or Not?"
         },
-        "Buy or Sell?": {
+        "Archive or Not?": {
             "Type": "Choice",
             "Choices": [
                 {
-                    "Variable": "$.stock_price",
+                    "Variable": "$.quality",
                     "NumericLessThanEquals": 50,
-                    "Next": "Buy Stock"
+                    "Next": "Archive Granule"
                 }
             ],
-            "Default": "Sell Stock"
+            "Default": "Bad Granule"
         },
-        "Sell Stock": {
+        "Archive Granule": {
             "Type": "Task",
-            "Resource": "${StockSellerFunctionArn}",
+            "Resource": "${ArchiveGranuleFunctionArn}",
             "Retry": [
                 {
                     "ErrorEquals": [
@@ -43,9 +43,9 @@
             ],
             "Next": "Record Transaction"
         },
-        "Buy Stock": {
+        "Bad Granule": {
             "Type": "Task",
-            "Resource": "${StockBuyerFunctionArn}",
+            "Resource": "${BadGranuleFunctionArn}",
             "Retry": [
                 {
                     "ErrorEquals": [
@@ -70,8 +70,8 @@
                     "Type": {
                         "S.$": "$.type"
                     },
-                    "Price": {
-                        "N.$": "$.price"
+                    "Quality": {
+                        "N.$": "$.quality"
                     },
                     "Quantity": {
                         "N.$": "$.qty"
