@@ -1,8 +1,8 @@
 {
     "Comment": "A state machine that does mock stock trading.",
-    "StartAt": "Generate Info",
+    "StartAt": "Generate Quality",
     "States": {
-        "Generate Info": {
+        "Generate Quality": {
             "Type": "Task",
             "Resource": "${GenerateInfoFunctionArn}",
             "Retry": [
@@ -21,8 +21,8 @@
             "Type": "Choice",
             "Choices": [
                 {
-                    "Variable": "$.quality",
-                    "NumericLessThanEquals": 50,
+                    "Variable": "$.granule.quality",
+                    "NumericGreaterThanEquals": 50,
                     "Next": "Archive Granule"
                 }
             ],
@@ -31,6 +31,9 @@
         "Archive Granule": {
             "Type": "Task",
             "Resource": "${ArchiveGranuleFunctionArn}",
+            "Parameters": {
+              "quality.$": "$.granule.quality"
+            },
             "Retry": [
                 {
                     "ErrorEquals": [
@@ -41,11 +44,14 @@
                     "BackoffRate": 1
                 }
             ],
-            "Next": "Record Transaction"
+            "Next": "Record Archive"
         },
         "Bad Granule": {
             "Type": "Task",
             "Resource": "${BadGranuleFunctionArn}",
+            "Parameters": {
+              "quality.$": "$.granule.quality"
+            },
             "Retry": [
                 {
                     "ErrorEquals": [
@@ -56,9 +62,9 @@
                     "BackoffRate": 1
                 }
             ],
-            "Next": "Record Transaction"
+            "Next": "Record Archive"
         },
-        "Record Transaction": {
+        "Record Archive": {
             "Type": "Task",
             "Resource": "${DDBPutItem}",
             "Parameters": {

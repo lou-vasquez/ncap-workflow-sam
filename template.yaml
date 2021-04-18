@@ -6,10 +6,10 @@ Description: >
   Sample SAM Template for lv-sam-app-step-test
 
 Resources:
-  StockTradingStateMachine:
+  ArchiverStateMachine:
     Type: AWS::Serverless::StateMachine # More info about State Machine Resource: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-statemachine.html
     Properties:
-      DefinitionUri: statemachine/stock_trader.asl.json
+      DefinitionUri: statemachine/archiver_tiny_logic_test.asl.json
       Tags:
         "noaa:projectid": ncap
         "nesdis:name": ncap-archive
@@ -19,7 +19,7 @@ Resources:
         ArchiveGranuleFunctionArn: !GetAtt ArchiveGranuleFunction.Arn
         BadGranuleFunctionArn: !GetAtt BadGranuleFunction.Arn
         DDBPutItem: !Sub arn:${AWS::Partition}:states:::dynamodb:putItem
-        DDBTable: !Ref TransactionTable
+        DDBTable: !Ref ArchiveTable
       # Events:
       #   HourlyAggregationSchedule:
       #     Type: Schedule
@@ -35,14 +35,18 @@ Resources:
         - LambdaInvokePolicy:
             FunctionName: !Ref BadGranuleFunction
         - DynamoDBWritePolicy:
-            TableName: !Ref TransactionTable
+            TableName: !Ref ArchiveTable
 
   GenerateInfoFunction:
-    Type: AWS::Serverless::Function # More info about Function Resource: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-function.html
+    Type: AWS::Serverless::Function
     Properties:
       CodeUri: functions/generate-info/
       Handler: app.lambdaHandler
       Runtime: nodejs14.x
+      Tags:
+        "noaa:projectid": ncap
+        "nesdis:name": ncap-archive
+        "ncap:poc": lou.vasquez@noaa.gov
 
   ArchiveGranuleFunction:
     Type: AWS::Serverless::Function
@@ -50,6 +54,10 @@ Resources:
       CodeUri: functions/archive-granule/
       Handler: app.lambdaHandler
       Runtime: nodejs14.x
+      Tags:
+        "noaa:projectid": ncap
+        "nesdis:name": ncap-archive
+        "ncap:poc": lou.vasquez@noaa.gov
 
   BadGranuleFunction:
     Type: AWS::Serverless::Function
@@ -57,9 +65,13 @@ Resources:
       CodeUri: functions/bad-granule/
       Handler: app.lambdaHandler
       Runtime: nodejs14.x
+      Tags:
+        "noaa:projectid": ncap
+        "nesdis:name": ncap-archive
+        "ncap:poc": lou.vasquez@noaa.gov
 
-  TransactionTable:
-    Type: AWS::Serverless::SimpleTable # More info about SimpleTable Resource: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-simpletable.html
+  ArchiveTable:
+    Type: AWS::Serverless::SimpleTable
     Properties:
       PrimaryKey:
         Name: Id
@@ -67,11 +79,15 @@ Resources:
       ProvisionedThroughput:
         ReadCapacityUnits: 1
         WriteCapacityUnits: 1
+      Tags:
+        "noaa:projectid": ncap
+        "nesdis:name": ncap-archive
+        "ncap:poc": lou.vasquez@noaa.gov
 
 Outputs:
-  StockTradingStateMachineArn:
-    Description: "Stock Trading state machine ARN"
-    Value: !Ref StockTradingStateMachine
-  StockTradingStateMachineRole:
-    Description: "IAM Role created for Stock Trading state machine based on the specified SAM Policy Templates"
-    Value: !GetAtt StockTradingStateMachineRole.Arn
+  ArchiverStateMachineArn:
+    Description: "Archiver state machine ARN"
+    Value: !Ref ArchiverStateMachine
+  ArchiverStateMachineRole:
+    Description: "IAM Role for Archiver"
+    Value: !GetAtt ArchiverStateMachineRole.Arn
