@@ -1,0 +1,16 @@
+{
+  "name": "bad_granule",
+  "version": "1.0.0",
+  "description": "archive granule for NodeJS",
+  "main": "app.js",
+  "repository": "TODO",
+  "author": "SAM CLI",
+  "license": "MIT",
+  "dependencies": {},
+  "scripts": {
+  },
+  "devDependencies": {
+    "chai": "^4.2.0",
+    "mocha": "^8.2.1"
+  }
+}
