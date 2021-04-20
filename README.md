@@ -1,5 +1,9 @@
 # overview
 
+<p align="center">
+  <img src="sam_ncap_stepfunction.png" width="300" title="flow">
+</p>
+
 key points
 - most info less about SAM, more about step functions or cloudformation
 - SAM is mostly just cloudformation + step functions + lambdas...
