@@ -7,7 +7,7 @@ Description: >
 
 Resources:
   ArchiverStateMachine:
-    Type: AWS::Serverless::StateMachine # More info about State Machine Resource: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-statemachine.html
+    Type: AWS::Serverless::StateMachine
     Properties:
       DefinitionUri: statemachine/archiver_tiny_logic_test.asl.json
       Tags:
@@ -15,9 +15,10 @@ Resources:
         "nesdis:name": ncap-archive
         "ncap:poc": lou.vasquez@noaa.gov
       DefinitionSubstitutions:
-        GenerateInfoFunctionArn: !GetAtt GenerateInfoFunction.Arn
+        SimulateInfoFunctionArn: !GetAtt SimulateInfoFunction.Arn
         ArchiveGranuleFunctionArn: !GetAtt ArchiveGranuleFunction.Arn
         BadGranuleFunctionArn: !GetAtt BadGranuleFunction.Arn
+        UnarchivableGranuleFunctionArn: !GetAtt UnarchivableGranuleFunction.Arn
         DDBPutItem: !Sub arn:${AWS::Partition}:states:::dynamodb:putItem
         DDBTable: !Ref ArchiveTable
       # Events:
@@ -27,20 +28,22 @@ Resources:
       #       Description: Schedule to run aggregation
       #       Enabled: False
       #       Schedule: "rate(1 hour)"
-      Policies: # Find out more about SAM policy templates: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-policy-templates.html
+      Policies:
         - LambdaInvokePolicy:
-            FunctionName: !Ref GenerateInfoFunction
+            FunctionName: !Ref SimulateInfoFunction
         - LambdaInvokePolicy:
             FunctionName: !Ref ArchiveGranuleFunction
         - LambdaInvokePolicy:
             FunctionName: !Ref BadGranuleFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref UnarchivableGranuleFunction
         - DynamoDBWritePolicy:
             TableName: !Ref ArchiveTable
 
-  GenerateInfoFunction:
+  SimulateInfoFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: functions/generate-info/
+      CodeUri: functions/simulate-info/
       Handler: app.lambdaHandler
       Runtime: nodejs14.x
       Tags:
@@ -65,6 +68,24 @@ Resources:
       CodeUri: functions/bad-granule/
       Handler: app.lambdaHandler
       Runtime: nodejs14.x
+      Tags:
+        "noaa:projectid": ncap
+        "nesdis:name": ncap-archive
+        "ncap:poc": lou.vasquez@noaa.gov
+
+  UnarchivableGranuleFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      Runtime: python3.6
+      InlineCode: |
+        import datetime
+        def handler(event, context):
+          url = event['url']
+          return {
+            'action' : 'Unarchivable',
+            'timestamp': datetime.datetime.now().isoformat()
+          }
       Tags:
         "noaa:projectid": ncap
         "nesdis:name": ncap-archive

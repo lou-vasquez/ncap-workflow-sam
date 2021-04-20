@@ -1,23 +1,24 @@
 {
-    "Comment": "A state machine that does mock stock trading.",
-    "StartAt": "Generate Quality",
+    "Comment": "A state machine that does mock archiving.",
+    "StartAt": "Simulate Info",
     "States": {
-        "Generate Quality": {
+        "Simulate Info": {
             "Type": "Task",
-            "Resource": "${GenerateInfoFunctionArn}",
-            "Retry": [
-                {
-                    "ErrorEquals": [
-                        "States.TaskFailed"
-                    ],
-                    "IntervalSeconds": 15,
-                    "MaxAttempts": 5,
-                    "BackoffRate": 1.5
-                }
-            ],
+            "Resource": "${SimulateInfoFunctionArn}",
             "Next": "Archive or Not?"
         },
         "Archive or Not?": {
+            "Type": "Choice",
+            "Choices": [
+                {
+                    "Variable": "$.granule.archive",
+                    "BooleanEquals": true,
+                    "Next": "Quality?"
+                }
+            ],
+            "Default": "Do Not Archive"
+        },
+        "Quality?": {
             "Type": "Choice",
             "Choices": [
                 {
@@ -32,8 +33,9 @@
             "Type": "Task",
             "Resource": "${ArchiveGranuleFunctionArn}",
             "Parameters": {
-              "quality.$": "$.granule.quality"
+              "url.$": "$.granule.url"
             },
+            "ResultPath": "$.action",
             "Retry": [
                 {
                     "ErrorEquals": [
@@ -44,14 +46,34 @@
                     "BackoffRate": 1
                 }
             ],
-            "Next": "Record Archive"
+            "Next": "Record Result"
+        },
+        "Do Not Archive": {
+            "Type": "Task",
+            "Resource": "${UnarchivableGranuleFunctionArn}",
+            "Parameters": {
+              "url.$": "$.granule.url"
+            },
+            "ResultPath": "$.action",
+            "Retry": [
+                {
+                    "ErrorEquals": [
+                        "States.TaskFailed"
+                    ],
+                    "IntervalSeconds": 2,
+                    "MaxAttempts": 3,
+                    "BackoffRate": 1
+                }
+            ],
+            "Next": "Record Result"
         },
         "Bad Granule": {
             "Type": "Task",
             "Resource": "${BadGranuleFunctionArn}",
             "Parameters": {
-              "quality.$": "$.granule.quality"
+              "url.$": "$.granule.url"
             },
+            "ResultPath": "$.action",
             "Retry": [
                 {
                     "ErrorEquals": [
@@ -62,28 +84,28 @@
                     "BackoffRate": 1
                 }
             ],
-            "Next": "Record Archive"
+            "Next": "Record Result"
         },
-        "Record Archive": {
+        "Record Result": {
             "Type": "Task",
             "Resource": "${DDBPutItem}",
             "Parameters": {
                 "TableName": "${DDBTable}",
                 "Item": {
                     "Id": {
-                        "S.$": "$.id"
+                        "S.$": "$.granule.id"
                     },
-                    "Type": {
-                        "S.$": "$.type"
+                    "Archive": {
+                        "BOOL.$": "$.granule.archive"
                     },
                     "Quality": {
-                        "N.$": "$.quality"
+                        "N.$": "States.JsonToString($.granule.quality)"
                     },
-                    "Quantity": {
-                        "N.$": "$.qty"
+                    "Action": {
+                        "S.$": "$.action.action"
                     },
                     "Timestamp": {
-                        "S.$": "$.timestamp"
+                        "S.$": "$.action.timestamp"
                     }
                 }
             },
