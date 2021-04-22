@@ -93,7 +93,7 @@ Resources:
           url = event['url']
           return {
             'action' : 'Unarchivable',
-            'timestamp': datetime.datetime.now().isoformat()
+            'timestamp': datetime.datetime.now().isoformat()[:-3]+"Z"
           }
       Tags:
         "noaa:projectid": ncap
