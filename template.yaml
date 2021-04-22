@@ -15,12 +15,15 @@ Resources:
         "nesdis:name": ncap-archive
         "ncap:poc": lou.vasquez@noaa.gov
       DefinitionSubstitutions:
+        SetDefaultsFunctionArn: !GetAtt SetDefaultsFunction.Arn
         SimulateInfoFunctionArn: !GetAtt SimulateInfoFunction.Arn
         ArchiveGranuleFunctionArn: !GetAtt ArchiveGranuleFunction.Arn
         BadGranuleFunctionArn: !GetAtt BadGranuleFunction.Arn
         UnarchivableGranuleFunctionArn: !GetAtt UnarchivableGranuleFunction.Arn
         DDBPutItem: !Sub arn:${AWS::Partition}:states:::dynamodb:putItem
         DDBTable: !Ref ArchiveTable
+        HumanSQSUrl: !Ref HumanSQS
+
       # Events:
       #   HourlyAggregationSchedule:
       #     Type: Schedule
@@ -37,8 +40,14 @@ Resources:
             FunctionName: !Ref BadGranuleFunction
         - LambdaInvokePolicy:
             FunctionName: !Ref UnarchivableGranuleFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref SetDefaultsFunction
         - DynamoDBWritePolicy:
             TableName: !Ref ArchiveTable
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt HumanSQS.QueueName
+        - SQSPollerPolicy:
+            QueueName: !GetAtt HumanSQS.QueueName
 
   SimulateInfoFunction:
     Type: AWS::Serverless::Function
@@ -91,6 +100,21 @@ Resources:
         "nesdis:name": ncap-archive
         "ncap:poc": lou.vasquez@noaa.gov
 
+  SetDefaultsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      Runtime: python3.6
+      InlineCode: |
+        def handler(event, context):
+          return {
+            'approval_needed': (event['approval_needed'] if ('approval_needed' in event) else False )
+          }
+      Tags:
+        "noaa:projectid": ncap
+        "nesdis:name": ncap-archive
+        "ncap:poc": lou.vasquez@noaa.gov
+
   ArchiveTable:
     Type: AWS::Serverless::SimpleTable
     Properties:
@@ -105,6 +129,16 @@ Resources:
         "nesdis:name": ncap-archive
         "ncap:poc": lou.vasquez@noaa.gov
 
+  HumanSQS:
+    Type: AWS::SQS::Queue
+    # no idea why I can't get this to work here
+    # seems to want Key, maybe need Key/Value pairs
+    # Properties:
+    #   Tags:
+    #     "noaa:projectid": ncap
+    #     "nesdis:name": ncap-archive
+    #     "ncap:poc": lou.vasquez@noaa.gov
+
 Outputs:
   ArchiverStateMachineArn:
     Description: "Archiver state machine ARN"
@@ -112,3 +146,9 @@ Outputs:
   ArchiverStateMachineRole:
     Description: "IAM Role for Archiver"
     Value: !GetAtt ArchiverStateMachineRole.Arn
+  HumanQueueUrl :
+    Description : "SQS Human Queue URL"
+    Value: !Ref HumanSQS
+  HumanQueueName :
+    Description : "SQS Human Queue Name"
+    Value: !GetAtt HumanSQS.QueueName

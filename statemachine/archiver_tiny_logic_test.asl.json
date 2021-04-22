@@ -1,19 +1,57 @@
 {
     "Comment": "A state machine that does mock archiving.",
-    "StartAt": "Simulate Info",
+    "StartAt": "Set Defaults",
     "States": {
+        "Set Defaults": {
+            "Type": "Task",
+            "Resource": "${SetDefaultsFunctionArn}",
+            "Next": "Simulate Info"
+        },
         "Simulate Info": {
             "Type": "Task",
             "Resource": "${SimulateInfoFunctionArn}",
-            "Next": "Archive or Not?"
+            "ResultPath": "$.granule",
+            "Next": "Need Approval?"
+        },
+        "Need Approval?": {
+            "Type": "Choice",
+            "Choices": [
+                {
+                  "And": [
+                    {
+                      "Variable": "$.approval_needed",
+                      "IsPresent": true
+                    },
+                    {
+                      "Variable": "$.approval_needed",
+                      "BooleanEquals": true,
+                    }
+                  ],
+                  "Next": "Data Manager Approval?"
+                }
+            ],
+            "Default": "Archive or Not?"
+        },
+        "Data Manager Approval?": {
+          "Type": "Task",
+          "Resource": "arn:aws:states:::sqs:sendMessage.waitForTaskToken",
+          "Parameters": {
+            "QueueUrl": "${HumanSQSUrl}",
+            "MessageBody": {
+                "Message": "Approve me!",
+                "TaskToken.$": "$$.Task.Token"
+             }
+          },
+          "ResultPath": "$.approval",
+          "Next": "Archive or Not?"
         },
         "Archive or Not?": {
             "Type": "Choice",
             "Choices": [
                 {
-                    "Variable": "$.granule.archive",
-                    "BooleanEquals": true,
-                    "Next": "Quality?"
+                  "Variable": "$.granule.archive",
+                  "BooleanEquals": true,
+                  "Next": "Quality?"
                 }
             ],
             "Default": "Do Not Archive"
@@ -106,6 +144,9 @@
                     },
                     "Timestamp": {
                         "S.$": "$.action.timestamp"
+                    },
+                    "Approval": {
+                        "BOOL.$": "$.approval_needed"
                     }
                 }
             },

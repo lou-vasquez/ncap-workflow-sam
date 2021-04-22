@@ -40,41 +40,38 @@ refs
 ## basics
 ```
 sam build
+sam deploy
+# OR
 sam deploy --guided
 ```
+setup vars for interaction
 ```
-tn=`aws dynamodb list-tables | jq -r '.TableNames|.[]|select(match(".*ArchiveTable.*"))'`
+tn=`aws dynamodb list-tables | jq -r '.TableNames|.[]|select(match(".*ArchiveTable.*"))'|head -1`
 sf=`aws stepfunctions list-state-machines | jq -r '.stateMachines|.[]|select(.stateMachineArn|match(".*ArchiverStateMachine.*"))|.stateMachineArn'`
 echo $tn
 echo $sf
+qu=`aws sqs list-queues | jq -r '.QueueUrls|.[]' | head -1`
+echo $qu
 ```
-```
-aws dynamodb scan --table-name $tn
-aws stepfunctions start-execution --state-machine-arn $sf
-```
-## cool ui
-
-debugging stepfunctions and lambdas in AWS console is amazing
-
-- AWS -> Step Functions -> State Machines -> [machine] -> [exectution]
-- AWS -> Cloud Watch -> Lambda
-- AWS -> Lambda -> Functions -> [function] -> Monitor
-
-## optionally delete existing records
-sometimes on SAM changes new table not generated
+(optional) delete table docs if necessary
 ```
 aws dynamodb scan --table-name "$tn" --max-items 1000 | tee moo.records   
 cat moo.records | jq -r '.Items[].Id.S' \
     | xargs -I keyItem aws dynamodb delete-item --table-name "$tn" --key='{"Id":{"S":"keyItem"}}'
 ```
-## run
+```
+aws dynamodb scan --table-name $tn
+```
+
+## run (normal pre human interaction [neanderthal])
 ```
 aws stepfunctions start-execution --state-machine-arn $sf
 seq 10 | xargs -I moo aws stepfunctions start-execution --state-machine-arn $sf
 ```
 ```
 aws dynamodb scan --table-name $tn \
-    | jq -r '.Items|.[]|(.Timestamp.S+"\t"+(.Archive.BOOL|tostring)+"\t"+.Quality.N+"\t"+.Action.S)'
+    | jq -r '.Items|.[]|(.Timestamp.S+"\t"+(.Archive.BOOL|tostring)+"\t"+.Quality.N+"\t"+.Action.S+"\t"+(.Approval.BOOL|tostring))'
+# timestamp archive quality result approval
 2021-04-20T06:16:14.455Z        true    4       Quality_Fail
 2021-04-20T06:16:19.193842      false   56      Unarchivable
 2021-04-20T06:15:52.132594      false   9       Unarchivable
@@ -83,6 +80,67 @@ aws dynamodb scan --table-name $tn \
 
 ```
 see (CloudWatch -> Logs -> Log groups) for events on statefunctions, lambdas, ?
+
+## cool ui
+
+debugging stepfunctions and lambdas in AWS console is amazing
+
+- AWS -> Step Functions -> State Machines -> [machine] -> [exectution]
+- AWS -> Cloud Watch -> Lambda
+- AWS -> Lambda -> Functions -> [function] -> Monitor
+
+
+## manual/human interaction
+kick off (does not use response here)
+```
+aws stepfunctions start-execution --state-machine-arn $sf --input '{"approval_needed":true}'
+```
+get token and message handle
+```
+aws sqs receive-message --queue-url $qu | tee moo.sqs.msg
+tt=`cat moo.sqs.msg| jq -r '.Messages[0].Body' | jq -r '.TaskToken'`
+echo $tt
+rh=`cat moo.sqs.msg| jq -r '.Messages[0].ReceiptHandle'`
+echo $rh
+```
+manually send success callback
+```
+aws stepfunctions send-task-success --task-token "$tt" --task-output '{"approved":false}'
+# OR
+# aws stepfunctions send-task-success --task-token "$tt" --task-output '{"approved":true}'
+aws sqs delete-message --queue-url $qu --receipt-handle
+```
+
+## optionally delete existing records
+sometimes on SAM changes new table not generated
+```
+aws dynamodb scan --table-name "$tn" --max-items 1000 | tee moo.records   
+cat moo.records | jq -r '.Items[].Id.S' \
+    | xargs -I keyItem aws dynamodb delete-item --table-name "$tn" --key='{"Id":{"S":"keyItem"}}'
+```
+
+# human interaction info
+
+## SQS to whatever
+
+uses sqs waitForTaskToken
+```"Resource": "arn:aws:states:::sqs:sendMessage.waitForTaskToken"```
+- send token via SQS (could send any number of ways)
+- manually invoke callback (SendTaskSuccess or SendTaskFailure)
+
+```
+aws sqs receive-message --queue-url $qu > moo.sqs.msg
+tt=`cat moo.sqs.msg| jq -r '.Messages[0].Body' | jq -r '.TaskToken'`
+echo $tt
+aws stepfunctions send-task-success --task-token "$tt" --task-output 'approve me!'
+aws sqs delete-message --queue-url $qu --receipt-handle
+```
+
+## email w/ API Gateway
+
+very cool example that emails a link for approval (or denial)</br>
+uses lambda waitForTaskToken
+- https://docs.aws.amazon.com/step-functions/latest/dg/tutorial-human-approval.html#human-approval-yaml
 
 # troubleshooting
 
