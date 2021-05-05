@@ -1,0 +1,66 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  lv-step-test
+
+Resources:
+  TestStepsLv:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      DefinitionUri: statemachine/archiver_tiny_logic_test.asl.json
+      Tags:
+        "noaa:projectid": ncap
+        "nesdis:name": ncap-archive
+        "ncap:poc": lou.vasquez@noaa.gov
+      DefinitionSubstitutions:
+        RandomizerArn: !GetAtt Randomizer.Arn
+        NumIncrementeArn: !GetAtt NumIncrementer.Arn
+
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref Randomizer
+        - LambdaInvokePolicy:
+            FunctionName: !Ref NumIncrementer
+
+  Randomizer:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      Runtime: python3.6
+      InlineCode: |
+        import random
+        def handler(event, context):
+          return {
+            'rando': random.randint(0,100)
+          }
+      Tags:
+        "noaa:projectid": ncap
+        "nesdis:name": ncap-archive
+        "ncap:poc": lou.vasquez@noaa.gov
+
+  NumIncrementer:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      Runtime: python3.6
+      InlineCode: |
+        def handler(event, context):
+          return {
+            'num': ((event['num']+1) if ('num' in event) else 1 )
+          }
+      Tags:
+        "noaa:projectid": ncap
+        "nesdis:name": ncap-archive
+        "ncap:poc": lou.vasquez@noaa.gov
+
+
+Outputs:
+  TestStepsLv:
+    Description: "test step function"
+    Value: !Ref TestStepsLv
+  Randomizer:
+    Description: "randomizer arn"
+    Value: !GetAtt Randomizer.Arn
+  NumIncrementer:
+    Description: "num incrementer arn"
+    Value: !GetAtt NumIncrementer.Arn

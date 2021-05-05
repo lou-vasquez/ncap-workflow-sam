@@ -1,0 +1,32 @@
+{
+    "Comment": "A state machine that goes multiple paths.",
+    "StartAt": "Split",
+    "States": {
+        "Split": {
+            "Type": "Parallel",
+            "End": true,
+            "Branches": [
+              {
+                "StartAt": "Randomizer",
+                "States": {
+                  "Randomizer": {
+                    "Type": "Task",
+                    "Resource": "${RandomizerArn}",
+                    "End": true
+                  }
+                }
+              },
+              {
+                "StartAt": "NumIncrementer",
+                "States": {
+                  "NumIncrementer": {
+                    "Type": "Task",
+                    "Resource": "${NumIncrementeArn}",
+                    "End": true
+                  }
+                }
+              }
+            ]
+        }
+    }
+}
